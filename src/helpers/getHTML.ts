@@ -1,5 +1,6 @@
 import errorinCuy from "./errorinCuy.js";
 import sanitizeHtml from "sanitize-html";
+import { gotScraping } from "got-scraping";
 
 // Disable SSL verification for scraper targets (expired certs common on pirate sites)
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
@@ -13,89 +14,56 @@ export default async function getHTML(
   ref?: string,
   sanitize = false
 ): Promise<string> {
-  const url = new URL(pathname, baseUrl);
+  const url = new URL(pathname, baseUrl).toString();
+
   const headers: Record<string, string> = {
-    "User-Agent": userAgent,
-    Accept:
-      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-    "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
-    "Cache-Control": "max-age=0",
-    "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-    "Sec-Ch-Ua-Mobile": "?0",
-    "Sec-Ch-Ua-Platform": '"Windows"',
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "same-origin",
-    "Upgrade-Insecure-Requests": "1",
+    // Referer is important for some sites validation
+    ...(ref ? { Referer: ref.startsWith("http") ? ref : new URL(ref, baseUrl).toString() } : {})
   };
 
-  if (ref) {
-    headers.Referer = ref.startsWith("http") ? ref : new URL(ref, baseUrl).toString();
-  }
-
-  const response = await fetch(url, { headers, redirect: "manual" });
-
-  if (!response.ok) {
-    response.status > 399 ? errorinCuy(response.status) : errorinCuy(404);
-  }
-
-  const html = await response.text();
-
-  if (!html.trim()) errorinCuy(404);
-
-  if (sanitize) {
-    return sanitizeHtml(html, {
-      allowedTags: [
-        "address",
-        "article",
-        "aside",
-        "footer",
-        "header",
-        "h1",
-        "h2",
-        "h3",
-        "h4",
-        "h5",
-        "h6",
-        "main",
-        "nav",
-        "section",
-        "blockquote",
-        "div",
-        "dl",
-        "figcaption",
-        "figure",
-        "hr",
-        "li",
-        "main",
-        "ol",
-        "p",
-        "pre",
-        "ul",
-        "a",
-        "abbr",
-        "b",
-        "br",
-        "code",
-        "data",
-        "em",
-        "i",
-        "mark",
-        "span",
-        "strong",
-        "sub",
-        "sup",
-        "time",
-        "u",
-        "img",
-      ],
-      allowedAttributes: {
-        a: ["href", "name", "target"],
-        img: ["src"],
-        "*": ["class", "id"],
+  try {
+    const response = await gotScraping({
+      url,
+      headers,
+      headerGeneratorOptions: {
+        browsers: [{ name: 'chrome', minVersion: 110 }],
+        devices: ['desktop'],
+        locales: ['en-US', 'en'],
+        operatingSystems: ['windows'],
       },
+      throwHttpErrors: false, // We handle errors manually
+      timeout: { request: 10000 } // 10s timeout
     });
-  }
 
-  return html as string;
+    if (response.statusCode > 399) {
+      errorinCuy(response.statusCode);
+    }
+
+    const html = response.body;
+
+    if (!html.trim()) errorinCuy(404);
+
+    if (sanitize) {
+      return sanitizeHtml(html, {
+        allowedTags: [
+          "address", "article", "aside", "footer", "header", "h1", "h2", "h3", "h4", "h5", "h6",
+          "main", "nav", "section", "blockquote", "div", "dl", "figcaption", "figure", "hr",
+          "li", "main", "ol", "p", "pre", "ul", "a", "abbr", "b", "br", "code", "data", "em",
+          "i", "mark", "span", "strong", "sub", "sup", "time", "u", "img",
+        ],
+        allowedAttributes: {
+          a: ["href", "name", "target"],
+          img: ["src"],
+          "*": ["class", "id"],
+        },
+      });
+    }
+
+    return html;
+  } catch (error) {
+    console.error("Scraping Error:", error);
+    // @ts-ignore
+    errorinCuy(error.response?.statusCode || 500);
+    return "";
+  }
 }
