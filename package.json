@@ -14,6 +14,17 @@
   },
   "keywords": [],
   "author": "eternime",
+  "_moduleAliases": {
+    "@configs": "dist/configs",
+    "@controllers": "dist/controllers",
+    "@helpers": "dist/helpers",
+    "@interfaces": "dist/interfaces",
+    "@middlewares": "dist/middlewares",
+    "@parsers": "dist/parsers",
+    "@routes": "dist/routes",
+    "@schemas": "dist/schemas",
+    "@scrapers": "dist/scrapers"
+  },
   "license": "MIT",
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -33,6 +44,7 @@
     "express": "^4.21.1",
     "express-rate-limit": "^8.2.1",
     "lru-cache": "^11.0.1",
+    "module-alias": "^2.2.3",
     "morgan": "^1.10.1",
     "node-html-parser": "^7.0.1",
     "sanitize-html": "^2.17.0",
