@@ -14,17 +14,6 @@
   },
   "keywords": [],
   "author": "eternime",
-  "_moduleAliases": {
-    "@configs": "dist/configs",
-    "@controllers": "dist/controllers",
-    "@helpers": "dist/helpers",
-    "@interfaces": "dist/interfaces",
-    "@middlewares": "dist/middlewares",
-    "@parsers": "dist/parsers",
-    "@routes": "dist/routes",
-    "@schemas": "dist/schemas",
-    "@scrapers": "dist/scrapers"
-  },
   "license": "MIT",
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -33,11 +22,11 @@
     "@types/sanitize-html": "^2.16.0",
     "rimraf": "^6.0.1",
     "tsc-alias": "^1.8.10",
-    "tsconfig-paths": "^4.2.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "tsconfig-paths": "^4.2.0",
     "@types/morgan": "^1.9.10",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
