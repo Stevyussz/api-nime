@@ -1,58 +1,52 @@
-import errorinCuy from "./errorinCuy.js";
-import sanitizeHtml from "sanitize-html";
+import otakudesuConfig from "@configs/otakudesu.config.js";
+import getHTML, { userAgent } from "@helpers/getHTML.js";
+import { parse, type HTMLElement } from "node-html-parser";
 
-// ⚠️ PASTE URL WORKER CLOUDFLARE KAMU DI SINI (JANGAN SAMPAI SALAH)
-// Contoh: "https://eter.massurya709.workers.dev"
-const PROXY_URL = "https://URL-WORKER-YANG-KAMU-BUAT-TADI.workers.dev"; 
+const { baseUrl } = otakudesuConfig;
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+const otakudesuScraper = {
+  async scrapeDOM(pathname: string, ref?: string, sanitize: boolean = false): Promise<HTMLElement> {
+    const html = await getHTML(baseUrl, pathname, ref, sanitize);
+    const document = parse(html, {
+      parseNoneClosedTags: true,
+    });
 
-export const userAgent =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+    return document;
+  },
 
-export default async function getHTML(
-  baseUrl: string,
-  pathname: string,
-  ref?: string,
-  sanitize = false
-): Promise<string> {
-  // 1. Gabungkan URL Asli Otakudesu
-  const targetUrl = new URL(pathname, baseUrl).toString();
-
-  // 2. Bungkus dengan Proxy Cloudflare Worker
-  // Hasilnya jadi: https://worker.dev?url=https://otakudesu.cloud/...
-  const finalUrl = `${PROXY_URL}?url=${encodeURIComponent(targetUrl)}`;
-
-  console.log(`[PROXY] Fetching via Worker: ${finalUrl}`);
-
-  // Headers kita kosongkan sebagian biar Worker yang handle
-  const headers: Record<string, string> = {
-    "User-Agent": userAgent, // Sekedar identitas
-  };
-
-  const response = await fetch(finalUrl, { headers });
-
-  if (!response.ok) {
-    console.error(`[FAIL] Status: ${response.status} via Proxy`);
-    // Tetap error handling standar
-    response.status > 399 ? errorinCuy(response.status) : errorinCuy(404);
-  }
-
-  const html = await response.text();
-
-  if (!html.trim()) errorinCuy(404);
-
-  if (sanitize) {
-    return sanitizeHtml(html, {
-      allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "iframe"]),
-      allowedAttributes: {
-        ...sanitizeHtml.defaults.allowedAttributes,
-        iframe: ["src", "width", "height"],
-        img: ["src", "alt"],
-        "*": ["class", "id"],
+  async scrapeNonce(body: string, referer: string): Promise<{ data?: string }> {
+    const nonceResponse = await fetch(new URL("/wp-admin/admin-ajax.php", baseUrl), {
+      method: "POST",
+      body,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "User-Agent": userAgent,
+        Referer: referer,
+        Origin: baseUrl,
       },
     });
-  }
 
-  return html as string;
-}
+    const nonce = (await nonceResponse.json()) as { data: string };
+
+    return nonce;
+  },
+
+  async scrapeServer(body: string, referer: string): Promise<{ data?: string }> {
+    const serverResponse = await fetch(new URL("/wp-admin/admin-ajax.php", baseUrl), {
+      method: "POST",
+      body,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "User-Agent": userAgent,
+        Origin: baseUrl,
+        Referer: referer,
+      },
+    });
+
+    const server = (await serverResponse.json()) as { data: string };
+
+    return server;
+  },
+};
+
+export default otakudesuScraper;
