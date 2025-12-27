@@ -5,7 +5,7 @@ import sanitizeHtml from "sanitize-html";
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 export const userAgent =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0";
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 export default async function getHTML(
   baseUrl: string,
@@ -19,7 +19,7 @@ export default async function getHTML(
   };
 
   if (ref) {
-    headers.Refferer = ref.startsWith("http") ? ref : new URL(ref, baseUrl).toString();
+    headers.Referer = ref.startsWith("http") ? ref : new URL(ref, baseUrl).toString();
   }
 
   const response = await fetch(url, { headers, redirect: "manual" });
