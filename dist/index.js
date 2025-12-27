@@ -1,3 +1,7 @@
+import "dotenv/config";
+import rateLimit from "express-rate-limit";
+import morgan from "morgan";
+import cors from "cors";
 import { clientCache } from "./middlewares/cache.js";
 import appConfig from "./configs/app.config.js";
 import express from "express";
@@ -8,6 +12,13 @@ import kuramanimeRouter from "./routes/kuramanime.routes.js";
 import setPayload from "./helpers/setPayload.js";
 const { PORT } = appConfig;
 const app = express();
+app.use(cors()); // Allow all for now to prevent dev issues, or restrict to process.env.FRONTEND_URL
+app.use(morgan("dev"));
+app.use(rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    limit: 100, // limit each IP to 100 requests per windowMs
+    message: "Too many requests from this IP, please try again later",
+}));
 app.use(clientCache(1));
 app.get("/", (req, res) => {
     const routes = [

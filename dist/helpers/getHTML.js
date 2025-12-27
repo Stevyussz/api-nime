@@ -1,5 +1,7 @@
 import errorinCuy from "./errorinCuy.js";
 import sanitizeHtml from "sanitize-html";
+// Disable SSL verification for scraper targets (expired certs common on pirate sites)
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 export const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0";
 export default async function getHTML(baseUrl, pathname, ref, sanitize = false) {
     const url = new URL(pathname, baseUrl);

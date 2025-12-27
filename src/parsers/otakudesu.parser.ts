@@ -446,10 +446,12 @@ const otakudesuParser = {
 
     const infoElems = document.querySelectorAll(".infozingle b");
     const getInfo = otakudesuExtraParser.parseInfo(infoElems);
+    const poster = Src(document.querySelector(".fotoanime img"));
 
     return {
       title,
       animeId,
+      poster,
       releaseTime,
       defaultStreamingUrl,
       hasPrevEpisode,

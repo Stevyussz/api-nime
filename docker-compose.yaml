@@ -1,9 +1,9 @@
 services:
-  wajik-anime-api:
+  eter-anime-api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: wajik-anime-api
+    container_name: eter-anime-api
     restart: unless-stopped
     ports:
       - "3001:3001"

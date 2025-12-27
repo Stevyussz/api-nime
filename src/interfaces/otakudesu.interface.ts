@@ -103,6 +103,7 @@ export interface IAnimeDetails {
 export interface IEpisodeDetails {
   title: string;
   animeId: string;
+  poster: string;
   releaseTime: string;
   defaultStreamingUrl: string;
   hasPrevEpisode: boolean;

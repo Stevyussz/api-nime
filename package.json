@@ -1,5 +1,5 @@
 {
-  "name": "wajik-anime-api",
+  "name": "eter-anime-api",
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
@@ -13,7 +13,7 @@
     "node": "20 || >=22"
   },
   "keywords": [],
-  "author": "wajik45",
+  "author": "eternime",
   "license": "MIT",
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -27,9 +27,14 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@types/express-rate-limit": "^5.1.3",
+    "@types/morgan": "^1.9.10",
     "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
     "express": "^4.21.1",
+    "express-rate-limit": "^8.2.1",
     "lru-cache": "^11.0.1",
+    "morgan": "^1.10.1",
     "node-html-parser": "^7.0.1",
     "sanitize-html": "^2.17.0",
     "valibot": "^1.2.0"
