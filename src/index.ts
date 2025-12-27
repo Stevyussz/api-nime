@@ -1,5 +1,5 @@
 import "dotenv/config";
-import rateLimit from "express-rate-limit";
+import { rateLimit } from "express-rate-limit";
 import morgan from "morgan";
 import cors from "cors";
 import { clientCache } from "@middlewares/cache.js";
