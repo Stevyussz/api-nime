@@ -60,10 +60,11 @@ export default async function getHTML(
     }
 
     return html;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Scraping Error:", error);
-    // @ts-ignore
-    errorinCuy(error.response?.statusCode || 500);
+    const statusCode = error.response?.statusCode || 500;
+    const message = error.message || "Unknown scraping error";
+    errorinCuy(statusCode, message);
     return "";
   }
 }
