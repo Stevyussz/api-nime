@@ -1,8 +1,7 @@
 import errorinCuy from "./errorinCuy.js";
 import sanitizeHtml from "sanitize-html";
 
-// ⚠️ PASTE URL WORKER CLOUDFLARE KAMU DI SINI (JANGAN SAMPAI SALAH)
-// Contoh: "https://eter.massurya709.workers.dev"
+// 👇 PASTE URL WORKER KAMU DI SINI
 const PROXY_URL = "https://eter.massurya709.workers.dev"; 
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
@@ -16,43 +15,44 @@ export default async function getHTML(
   ref?: string,
   sanitize = false
 ): Promise<string> {
-  // 1. Gabungkan URL Asli Otakudesu
+  // 1. Target URL Asli
   const targetUrl = new URL(pathname, baseUrl).toString();
 
-  // 2. Bungkus dengan Proxy Cloudflare Worker
-  // Hasilnya jadi: https://worker.dev?url=https://otakudesu.cloud/...
+  // 2. Bungkus pake Proxy Worker biar IP Vercel gak kelihatan
   const finalUrl = `${PROXY_URL}?url=${encodeURIComponent(targetUrl)}`;
 
-  console.log(`[PROXY] Fetching via Worker: ${finalUrl}`);
+  console.log(`[PROXY] Fetching: ${finalUrl}`);
 
-  // Headers kita kosongkan sebagian biar Worker yang handle
   const headers: Record<string, string> = {
-    "User-Agent": userAgent, // Sekedar identitas
+    "User-Agent": userAgent,
   };
 
-  const response = await fetch(finalUrl, { headers });
+  try {
+    const response = await fetch(finalUrl, { headers });
 
-  if (!response.ok) {
-    console.error(`[FAIL] Status: ${response.status} via Proxy`);
-    // Tetap error handling standar
-    response.status > 399 ? errorinCuy(response.status) : errorinCuy(404);
+    if (!response.ok) {
+      console.error(`[FAIL] ${response.status} via Proxy`);
+      response.status > 399 ? errorinCuy(response.status) : errorinCuy(404);
+    }
+
+    const html = await response.text();
+
+    if (!html.trim()) errorinCuy(404);
+
+    if (sanitize) {
+      return sanitizeHtml(html, {
+        allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "iframe"]),
+        allowedAttributes: {
+          ...sanitizeHtml.defaults.allowedAttributes,
+          iframe: ["src", "width", "height"],
+          img: ["src", "alt"],
+          "*": ["class", "id"],
+        },
+      });
+    }
+
+    return html as string;
+  } catch (err) {
+    throw err;
   }
-
-  const html = await response.text();
-
-  if (!html.trim()) errorinCuy(404);
-
-  if (sanitize) {
-    return sanitizeHtml(html, {
-      allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "iframe"]),
-      allowedAttributes: {
-        ...sanitizeHtml.defaults.allowedAttributes,
-        iframe: ["src", "width", "height"],
-        img: ["src", "alt"],
-        "*": ["class", "id"],
-      },
-    });
-  }
-
-  return html as string;
 }
