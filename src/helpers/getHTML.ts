@@ -1,8 +1,10 @@
 import errorinCuy from "./errorinCuy.js";
 import sanitizeHtml from "sanitize-html";
-import { gotScraping } from "got-scraping";
 
-// Disable SSL verification for scraper targets (expired certs common on pirate sites)
+// ⚠️ PASTE URL WORKER CLOUDFLARE KAMU DI SINI (JANGAN SAMPAI SALAH)
+// Contoh: "https://eter.massurya709.workers.dev"
+const PROXY_URL = "https://eter.massurya709.workers.dev"; 
+
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 export const userAgent =
@@ -14,57 +16,43 @@ export default async function getHTML(
   ref?: string,
   sanitize = false
 ): Promise<string> {
-  const url = new URL(pathname, baseUrl).toString();
+  // 1. Gabungkan URL Asli Otakudesu
+  const targetUrl = new URL(pathname, baseUrl).toString();
 
+  // 2. Bungkus dengan Proxy Cloudflare Worker
+  // Hasilnya jadi: https://worker.dev?url=https://otakudesu.cloud/...
+  const finalUrl = `${PROXY_URL}?url=${encodeURIComponent(targetUrl)}`;
+
+  console.log(`[PROXY] Fetching via Worker: ${finalUrl}`);
+
+  // Headers kita kosongkan sebagian biar Worker yang handle
   const headers: Record<string, string> = {
-    // Referer is important for some sites validation
-    ...(ref ? { Referer: ref.startsWith("http") ? ref : new URL(ref, baseUrl).toString() } : {})
+    "User-Agent": userAgent, // Sekedar identitas
   };
 
-  try {
-    const response = await gotScraping({
-      url,
-      headers,
-      headerGeneratorOptions: {
-        browsers: [{ name: 'chrome', minVersion: 110 }],
-        devices: ['desktop'],
-        locales: ['en-US', 'en'],
-        operatingSystems: ['windows'],
-      },
-      throwHttpErrors: false, // We handle errors manually
-      timeout: { request: 10000 } // 10s timeout
-    });
+  const response = await fetch(finalUrl, { headers });
 
-    if (response.statusCode > 399) {
-      errorinCuy(response.statusCode);
-    }
-
-    const html = response.body;
-
-    if (!html.trim()) errorinCuy(404);
-
-    if (sanitize) {
-      return sanitizeHtml(html, {
-        allowedTags: [
-          "address", "article", "aside", "footer", "header", "h1", "h2", "h3", "h4", "h5", "h6",
-          "main", "nav", "section", "blockquote", "div", "dl", "figcaption", "figure", "hr",
-          "li", "main", "ol", "p", "pre", "ul", "a", "abbr", "b", "br", "code", "data", "em",
-          "i", "mark", "span", "strong", "sub", "sup", "time", "u", "img",
-        ],
-        allowedAttributes: {
-          a: ["href", "name", "target"],
-          img: ["src"],
-          "*": ["class", "id"],
-        },
-      });
-    }
-
-    return html;
-  } catch (error: any) {
-    console.error("Scraping Error:", error);
-    const statusCode = error.response?.statusCode || 500;
-    const message = error.message || "Unknown scraping error";
-    errorinCuy(statusCode, message);
-    return "";
+  if (!response.ok) {
+    console.error(`[FAIL] Status: ${response.status} via Proxy`);
+    // Tetap error handling standar
+    response.status > 399 ? errorinCuy(response.status) : errorinCuy(404);
   }
+
+  const html = await response.text();
+
+  if (!html.trim()) errorinCuy(404);
+
+  if (sanitize) {
+    return sanitizeHtml(html, {
+      allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "iframe"]),
+      allowedAttributes: {
+        ...sanitizeHtml.defaults.allowedAttributes,
+        iframe: ["src", "width", "height"],
+        img: ["src", "alt"],
+        "*": ["class", "id"],
+      },
+    });
+  }
+
+  return html as string;
 }
