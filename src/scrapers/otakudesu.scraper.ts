@@ -20,7 +20,6 @@ const otakudesuScraper = {
 
     const url = new URL(cleanPath, baseUrl).toString();
     const headers = {
-      "User-Agent": mobileUA,
       "Referer": ref ? (ref.startsWith("http") ? ref : new URL(ref, baseUrl).toString()) : baseUrl,
       "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
     };
@@ -32,12 +31,12 @@ const otakudesuScraper = {
         url,
         headers,
         headerGeneratorOptions: {
-          browsers: [{ name: 'chrome', minVersion: 110 }],
+          browsers: [{ name: 'chrome', minVersion: 120 }], // Ensure recent version
           devices: ['mobile'],
           locales: ['en-US', 'en'],
           operatingSystems: ['android'],
         },
-        http2: false, // safer for many pirate sites
+        http2: true, // Enable HTTP/2 for better masquerading
         https: { rejectUnauthorized: false }, // Fix CERT_HAS_EXPIRED
         throwHttpErrors: true,
         timeout: { request: 15000 },
