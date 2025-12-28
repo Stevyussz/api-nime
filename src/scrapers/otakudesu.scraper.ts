@@ -3,8 +3,8 @@ import { parse, type HTMLElement } from "node-html-parser";
 
 const { baseUrl } = otakudesuConfig;
 
-// Use Android UA like AnimeSail/Cloudstream to bypass WAF
-const mobileUA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36";
+// Use got-scraping defaults or custom options
+// const mobileUA = "Mozilla/5.0 ..."; // Removed legacy UA
 
 const otakudesuScraper = {
   async scrapeDOM(pathname: string, ref?: string, sanitize: boolean = false): Promise<HTMLElement> {
@@ -21,7 +21,8 @@ const otakudesuScraper = {
     const url = new URL(cleanPath, baseUrl).toString();
     const headers = {
       "Referer": ref ? (ref.startsWith("http") ? ref : new URL(ref, baseUrl).toString()) : baseUrl,
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Sec-Fetch-Site": "same-origin" // Since we provide the matching Referer
     };
 
     console.log(`[Otakudesu] Scraping ${url}`);
@@ -31,10 +32,10 @@ const otakudesuScraper = {
         url,
         headers,
         headerGeneratorOptions: {
-          browsers: [{ name: 'chrome', minVersion: 120 }], // Ensure recent version
-          devices: ['mobile'],
+          browsers: [{ name: 'chrome', minVersion: 120 }, { name: 'firefox', minVersion: 120 }],
+          devices: ['desktop'],
           locales: ['en-US', 'en'],
-          operatingSystems: ['android'],
+          operatingSystems: ['windows', 'linux'],
         },
         http2: true, // Enable HTTP/2 for better masquerading
         https: { rejectUnauthorized: false }, // Fix CERT_HAS_EXPIRED
@@ -61,12 +62,17 @@ const otakudesuScraper = {
         body,
         headers: {
           "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-          "User-Agent": mobileUA,
           "Referer": referer,
           "Origin": baseUrl,
           "X-Requested-With": "XMLHttpRequest"
         },
-        http2: false
+        http2: true,
+        headerGeneratorOptions: {
+          browsers: [{ name: 'chrome', minVersion: 120 }, { name: 'firefox', minVersion: 120 }],
+          devices: ['desktop'],
+          locales: ['en-US', 'en'],
+          operatingSystems: ['windows', 'linux'],
+        }
       });
       return JSON.parse(response.body) as { data: string };
     } catch (e) {
@@ -83,12 +89,17 @@ const otakudesuScraper = {
         body,
         headers: {
           "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-          "User-Agent": mobileUA,
           "Origin": baseUrl,
           "Referer": referer,
           "X-Requested-With": "XMLHttpRequest"
         },
-        http2: false
+        http2: true,
+        headerGeneratorOptions: {
+          browsers: [{ name: 'chrome', minVersion: 120 }, { name: 'firefox', minVersion: 120 }],
+          devices: ['desktop'],
+          locales: ['en-US', 'en'],
+          operatingSystems: ['windows', 'linux'],
+        }
       });
       return JSON.parse(response.body) as { data: string };
     } catch (e) {
