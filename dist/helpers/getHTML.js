@@ -1,56 +1,57 @@
 import errorinCuy from "./errorinCuy.js";
 import sanitizeHtml from "sanitize-html";
-import { gotScraping } from "got-scraping";
-// Disable SSL verification for scraper targets (expired certs common on pirate sites)
+// Kita ganti proxy pake AllOrigins (Lebih stabil buat text HTML)
+const PROXY_BASE = "https://api.allorigins.win/raw?url=";
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+// Export userAgent biar gak error build di file lain
 export const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 export default async function getHTML(baseUrl, pathname, ref, sanitize = false) {
-    const url = new URL(pathname, baseUrl).toString();
-    const headers = {
-        // Referer is important for some sites validation
-        ...(ref ? { Referer: ref.startsWith("http") ? ref : new URL(ref, baseUrl).toString() } : {})
-    };
+    // 1. URL LOGIC: PAKSA TAMBAH GARIS MIRING (/)
+    // Ini kuncinya bang. Kalau ini gak ada, lu kena redirect -> header ilang -> 403.
+    let cleanPath = pathname;
+    if (cleanPath.includes("/anime/") && !cleanPath.endsWith("/")) {
+        cleanPath += "/";
+    }
+    // 2. Gabungin URL Target
+    const targetUrl = new URL(cleanPath, baseUrl).toString();
+    // 3. Bungkus pake AllOrigins Proxy
+    const finalUrl = `${PROXY_BASE}${encodeURIComponent(targetUrl)}`;
+    console.log(`[PROXY AllOrigins] Fetching: ${targetUrl}`);
     try {
-        const response = await gotScraping({
-            url,
-            headers,
-            headerGeneratorOptions: {
-                browsers: [{ name: 'chrome', minVersion: 110 }],
-                devices: ['desktop'],
-                locales: ['en-US', 'en'],
-                operatingSystems: ['windows'],
-            },
-            throwHttpErrors: false, // We handle errors manually
-            timeout: { request: 10000 } // 10s timeout
-        });
-        if (response.statusCode > 399) {
-            errorinCuy(response.statusCode);
-        }
-        const html = response.body;
-        if (!html.trim())
-            errorinCuy(404);
-        if (sanitize) {
-            return sanitizeHtml(html, {
-                allowedTags: [
-                    "address", "article", "aside", "footer", "header", "h1", "h2", "h3", "h4", "h5", "h6",
-                    "main", "nav", "section", "blockquote", "div", "dl", "figcaption", "figure", "hr",
-                    "li", "main", "ol", "p", "pre", "ul", "a", "abbr", "b", "br", "code", "data", "em",
-                    "i", "mark", "span", "strong", "sub", "sup", "time", "u", "img",
-                ],
-                allowedAttributes: {
-                    a: ["href", "name", "target"],
-                    img: ["src"],
-                    "*": ["class", "id"],
-                },
+        // Fetch ke Proxy
+        const response = await fetch(finalUrl);
+        if (!response.ok) {
+            console.error(`[PROXY FAIL] ${response.status}`);
+            // Kalau proxy gagal, coba tembak langsung (sebagai cadangan)
+            const directResp = await fetch(targetUrl, {
+                headers: { "User-Agent": userAgent }
             });
+            if (!directResp.ok) {
+                directResp.status > 399 ? errorinCuy(directResp.status) : errorinCuy(404);
+            }
+            return processResponse(directResp, sanitize);
         }
-        return html;
+        return processResponse(response, sanitize);
     }
-    catch (error) {
-        console.error("Scraping Error:", error);
-        const statusCode = error.response?.statusCode || 500;
-        const message = error.message || "Unknown scraping error";
-        errorinCuy(statusCode, message);
-        return "";
+    catch (err) {
+        console.error("[FETCH ERROR]", err);
+        throw err;
     }
+}
+async function processResponse(response, sanitize) {
+    const html = await response.text();
+    if (!html.trim())
+        errorinCuy(404, "Empty HTML");
+    if (sanitize) {
+        return sanitizeHtml(html, {
+            allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "iframe"]),
+            allowedAttributes: {
+                ...sanitizeHtml.defaults.allowedAttributes,
+                iframe: ["src", "width", "height"],
+                img: ["src", "alt"],
+                "*": ["class", "id"],
+            },
+        });
+    }
+    return html;
 }

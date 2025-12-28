@@ -53,7 +53,10 @@ const animesailScraper = {
                 const html = response.body;
 
                 // Use node-html-parser
-                return parse(html, { parseNoneClosedTags: true });
+                const dom = parse(html, { parseNoneClosedTags: true });
+                const title = dom.querySelector("title")?.text || "No Title";
+                console.log(`[AnimeSail] Scraped ${url}: Title="${title}", Length=${html.length}`);
+                return dom;
 
             } catch (error: any) {
                 console.error(`AnimeSail Scraping Attempt ${i + 1} Failed:`, error.message);

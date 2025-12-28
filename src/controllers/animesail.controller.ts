@@ -102,8 +102,16 @@ const animesailController = {
         try {
             const { q } = v.parse(animesailSchema.query.search, req.query);
             const pathname = `/?s=${q}`;
+            console.log(`[AnimeSail] Searching for: ${q}`);
             const document = await animesailScraper.scrapeDOM(pathname, baseUrl);
             const list = animesailParser.parseSearch(document);
+            console.log(`[AnimeSail] Found ${list.length} results`);
+
+            if (list.length === 0) {
+                // Debugging help: return title seen by scraper if possible, or we rely on logs
+                // For now, let's trust the scraper log we just added.
+            }
+
             res.json(setPayload(res, { data: { list } }));
         } catch (error) {
             next(error);
