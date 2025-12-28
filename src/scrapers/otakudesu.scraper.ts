@@ -12,17 +12,10 @@ const otakudesuScraper = {
     // Dynamic import got-scraping
     const { gotScraping } = await import("got-scraping");
 
-    // Ensure trailing slash for /anime/ endpoints to avoid redirect loops/drops
-    let cleanPath = pathname;
-    if (cleanPath.includes("/anime/") && !cleanPath.endsWith("/")) {
-      cleanPath += "/";
-    }
-
-    const url = new URL(cleanPath, baseUrl).toString();
+    const url = new URL(pathname, baseUrl).toString();
     const headers = {
       "Referer": ref ? (ref.startsWith("http") ? ref : new URL(ref, baseUrl).toString()) : baseUrl,
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-      "Sec-Fetch-Site": "same-origin" // Since we provide the matching Referer
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
     };
 
     console.log(`[Otakudesu] Scraping ${url}`);
@@ -34,7 +27,7 @@ const otakudesuScraper = {
         headerGeneratorOptions: {
           browsers: [{ name: 'chrome', minVersion: 120 }, { name: 'firefox', minVersion: 120 }],
           devices: ['desktop'],
-          locales: ['en-US', 'en'],
+          locales: ['id-ID', 'id', 'en-US', 'en'], // Match target audience language
           operatingSystems: ['windows', 'linux'],
         },
         http2: true, // Enable HTTP/2 for better masquerading
