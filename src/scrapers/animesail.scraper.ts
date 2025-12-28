@@ -13,12 +13,16 @@ const animesailScraper = {
         const { gotScraping } = await import("got-scraping");
 
         const url = new URL(pathname, baseUrl).toString();
+        // Use Android UA to match Cloudstream behavior
+        const mobileUA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36";
         const headers = {
-            "User-Agent": userAgent,
+            "User-Agent": mobileUA,
             "Referer": ref ? (ref.startsWith("http") ? ref : new URL(ref, baseUrl).toString()) : baseUrl,
             "Cookie": "_as_ipin_ct=ID",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
         };
+
+        console.log(`[AnimeSail] Requesting ${url} with UA="${mobileUA}"`);
 
         let lastError: any;
         // Retry logic: 3 attempts
@@ -29,11 +33,11 @@ const animesailScraper = {
                     headers,
                     headerGeneratorOptions: {
                         browsers: [{ name: 'chrome', minVersion: 110 }],
-                        devices: ['desktop'],
+                        devices: ['mobile'], // Switch to mobile
                         locales: ['en-US', 'en'],
-                        operatingSystems: ['windows'],
+                        operatingSystems: ['android'], // Switch to android
                     },
-                    http2: false, // Revert to HTTP/1.1 to see if HTTP/2 was the issue
+                    http2: false, // Keep disabled for now
                     throwHttpErrors: false,
                     timeout: { request: 15000 },
                     retry: { limit: 0 }
