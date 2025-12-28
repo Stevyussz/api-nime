@@ -33,10 +33,10 @@ const animesailScraper = {
                         locales: ['en-US', 'en'],
                         operatingSystems: ['windows'],
                     },
-                    http2: true, // Enable HTTP/2 for better mimicry
+                    http2: false, // Revert to HTTP/1.1 to see if HTTP/2 was the issue
                     throwHttpErrors: false,
-                    timeout: { request: 15000 }, // Increased to 15s
-                    retry: { limit: 0 } // We manage retries manually
+                    timeout: { request: 15000 },
+                    retry: { limit: 0 }
                 });
 
                 if (response.statusCode === 403 || response.statusCode === 503) {
@@ -55,7 +55,8 @@ const animesailScraper = {
                 // Use node-html-parser
                 const dom = parse(html, { parseNoneClosedTags: true });
                 const title = dom.querySelector("title")?.text || "No Title";
-                console.log(`[AnimeSail] Scraped ${url}: Title="${title}", Length=${html.length}`);
+                const bodyText = dom.querySelector("body")?.text.substring(0, 200).replace(/\s+/g, " ").trim() || "No Body Text";
+                console.log(`[AnimeSail] Scraped ${url}: Title="${title}", Length=${html.length}, Body="${bodyText}..."`);
                 return dom;
 
             } catch (error: any) {
