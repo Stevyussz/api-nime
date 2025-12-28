@@ -241,7 +241,7 @@ const otakudesuParser = {
             }
         }
         const genreParEl = document.querySelector(".infozingle")?.lastElementChild;
-        const genreElems = genreParEl.querySelectorAll("a");
+        const genreElems = genreParEl?.querySelectorAll("a") || [];
         const genreList = otakudesuExtraParser.parseTextGenreList(genreElems);
         const animeElems = document.querySelectorAll(".isi-recommend-anime-series .isi-konten");
         const recommendedAnimeList = animeElems.map((animeEl) => {

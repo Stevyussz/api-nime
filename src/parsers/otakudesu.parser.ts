@@ -307,8 +307,8 @@ const otakudesuParser = {
       }
     }
 
-    const genreParEl = document.querySelector(".infozingle")?.lastElementChild!;
-    const genreElems = genreParEl.querySelectorAll("a");
+    const genreParEl = document.querySelector(".infozingle")?.lastElementChild;
+    const genreElems = genreParEl?.querySelectorAll("a") || [];
     const genreList = otakudesuExtraParser.parseTextGenreList(genreElems);
 
     const animeElems = document.querySelectorAll(".isi-recommend-anime-series .isi-konten");

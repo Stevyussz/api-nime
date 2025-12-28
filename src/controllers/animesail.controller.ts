@@ -21,9 +21,11 @@ const animesailController = {
 
     async getHome(req: Request, res: Response, next: NextFunction) {
         try {
-            const pathname = "/page/1/";
+            const page = req.query.page || 1;
+            const pathname = `/page/${page}/`;
             const document = await animesailScraper.scrapeDOM(pathname, baseUrl);
-            const list = animesailParser.parseHome(document);
+            const homeData = animesailParser.parseHome(document);
+            const list = homeData.latest;
             res.json(setPayload(res, { data: { list } }));
         } catch (error) {
             next(error);

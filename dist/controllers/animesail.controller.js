@@ -17,9 +17,11 @@ const animesailController = {
     },
     async getHome(req, res, next) {
         try {
-            const pathname = "/page/1/";
+            const page = req.query.page || 1;
+            const pathname = `/page/${page}/`;
             const document = await animesailScraper.scrapeDOM(pathname, baseUrl);
-            const list = animesailParser.parseHome(document);
+            const homeData = animesailParser.parseHome(document);
+            const list = homeData.latest;
             res.json(setPayload(res, { data: { list } }));
         }
         catch (error) {
@@ -97,10 +99,8 @@ const animesailController = {
         try {
             const { q } = v.parse(animesailSchema.query.search, req.query);
             const pathname = `/?s=${q}`;
-            console.log(`[AnimeSail] Searching for: ${q}`);
             const document = await animesailScraper.scrapeDOM(pathname, baseUrl);
             const list = animesailParser.parseSearch(document);
-            console.log(`[AnimeSail] Found ${list.length} results`);
             if (list.length === 0) {
                 // Debugging help: return title seen by scraper if possible, or we rely on logs
                 // For now, let's trust the scraper log we just added.

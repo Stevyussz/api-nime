@@ -75,10 +75,30 @@ const animesailParser = {
     },
 
     parseEpisodeDetails(document: HTMLElement): T.IEpisodeDetails {
-        // Nav
-        // Logic for next/prev
-        // Not strictly implemented in Kotlin code provided, but useful.
-        // Assuming simple extraction.
+        // Extract AnimeID from Breadcrumb or Relation
+        // Breadcrumb usually: Home > Anime Title > Episode Title
+        // Selector: .bricrumbs span:nth-child(2) a href
+        let animeId = "";
+        const breadcrumbLink = document.querySelector(".bricrumbs span:nth-child(2) a");
+        if (breadcrumbLink) {
+            animeId = breadcrumbLink.getAttribute("href")?.replace(baseUrl + "/anime/", "").replace(/\/$/, "") || "";
+        }
+
+        // Fallback: Try "All Episodes" link if exists, usually "Lihat Semua"
+        if (!animeId) {
+            const allEps = document.querySelector(".year > a"); // Sometimes here
+            if (allEps) {
+                animeId = allEps.getAttribute("href")?.replace(baseUrl + "/anime/", "").replace(/\/$/, "") || "";
+            }
+        }
+
+        // Navigation (Prev/Next)
+        // Usually located in div.flir
+        const prevBtn = document.querySelector(".flir > a:contains('Prev')") || document.querySelector(".flir > a:contains('Sebelumnya')");
+        const nextBtn = document.querySelector(".flir > a:contains('Next')") || document.querySelector(".flir > a:contains('Selanjutnya')");
+
+        const prevId = prevBtn?.getAttribute("href")?.replace(baseUrl + "/", "").replace(/\/$/, "") || undefined;
+        const nextId = nextBtn?.getAttribute("href")?.replace(baseUrl + "/", "").replace(/\/$/, "") || undefined;
 
         const servers: T.IServer[] = [];
         const options = document.querySelectorAll(".mobius > .mirror > option");
@@ -87,18 +107,11 @@ const animesailParser = {
             const title = opt.text.trim();
             const encodedData = opt.getAttribute("data-em");
             if (encodedData) {
-                // The serverId will be the encoded data itself, we decode in `getServerDetails`
-                // Or we decode here to find the real URL, and re-encode?
-                // Kotlin logic decoding:
-                // val iframe = Jsoup.parse(base64Decode(it.attr("data-em"))).select("iframe").attr("src")
-
-                // Let's decode here to be safe and clean
                 try {
                     const decodedHtml = Buffer.from(encodedData, 'base64').toString('utf-8');
                     const iframeSrc = parse(decodedHtml).querySelector("iframe")?.getAttribute("src");
 
                     if (iframeSrc) {
-                        // We encode the iframeSrc as the serverId for the next request
                         const serverId = Buffer.from(iframeSrc).toString('base64url');
                         servers.push({
                             title,
@@ -112,10 +125,12 @@ const animesailParser = {
         });
 
         return {
-            animeId: "",
-            episodeId: "",
-            hasPrev: false,
-            hasNext: false,
+            animeId,
+            episodeId: "", // caller fills this
+            hasPrev: !!prevId,
+            hasNext: !!nextId,
+            ...(prevId ? { prevId } : {}),
+            ...(nextId ? { nextId } : {}),
             servers
         };
     },
