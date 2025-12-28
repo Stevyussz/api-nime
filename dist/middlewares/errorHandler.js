@@ -34,8 +34,9 @@ export default function errorHandler(err, req, res, next) {
     }
     // const uuid = uuidv4();
     // logErrorToFile(err, req, uuid);
+    console.error("CRITICAL ERROR:", err);
     res.status(500).json(setPayload(res, {
         // message: `Terjadi kesalahan tak terduga. Request ID: ${uuid}`,
-        message: `Terjadi kesalahan tak terduga`,
+        message: `Terjadi kesalahan tak terduga: ${err.message || err}`,
     }));
 }

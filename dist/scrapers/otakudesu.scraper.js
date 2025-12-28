@@ -1,5 +1,5 @@
 import otakudesuConfig from "../configs/otakudesu.config.js";
-import getHTML from "../helpers/getHTML.js";
+import getHTML, { userAgent } from "../helpers/getHTML.js";
 import { parse } from "node-html-parser";
 const { baseUrl } = otakudesuConfig;
 const otakudesuScraper = {
@@ -16,6 +16,7 @@ const otakudesuScraper = {
             body,
             headers: {
                 "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "User-Agent": userAgent,
                 Referer: referer,
                 Origin: baseUrl,
             },
@@ -29,6 +30,7 @@ const otakudesuScraper = {
             body,
             headers: {
                 "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "User-Agent": userAgent,
                 Origin: baseUrl,
                 Referer: referer,
             },

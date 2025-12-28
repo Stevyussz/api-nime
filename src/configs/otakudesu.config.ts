@@ -1,5 +1,3 @@
-// import type { IAnimeConfig } from "@interfaces/IAnimeConfig";
-
 const otakudesuConfig: IAnimeConfig = {
   baseUrl: process.env.OTAKUDESU_BASE_URL || "https://otakudesu.cloud",
 };
