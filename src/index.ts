@@ -43,6 +43,20 @@ app.get("/", (req, res) => {
       pathParams: [],
       queryParams: [],
     },
+    {
+      method: "GET",
+      path: "/animesail",
+      description: "AnimeSail",
+      pathParams: [],
+      queryParams: [],
+    },
+    {
+      method: "GET",
+      path: "/samehadaku",
+      description: "Samehadaku",
+      pathParams: [],
+      queryParams: [],
+    },
   ];
 
   res.json(
@@ -59,18 +73,12 @@ app.use("/animesail", animesailRouter);
 
 app.use(errorHandler);
 
-app.use(errorHandler);
-
 // Export for Vercel
 export default app;
 
 // Start server only if run directly
 import { pathToFileURL } from "url";
 
-// Debug logs to see why it might be 'stuck'
-console.log("Starting application...");
-// console.log("Import Meta URL:", import.meta.url);
-// console.log("Process Argv[1]:", process.argv[1]);
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   app.listen(PORT, () => {

@@ -211,14 +211,13 @@ const kuramanimeController = {
         (query?.sort === "a-z"
           ? "ascending"
           : query?.sort === "z-a"
-          ? "descending"
-          : query?.sort) || (status === "ongoing" ? "updated" : "latest");
+            ? "descending"
+            : query?.sort) || (status === "ongoing" ? "updated" : "latest");
 
       function getPathname() {
         if (status) {
-          return `/quick/${
-            status === "completed" ? "finished" : status
-          }?order_by=${sort}&page=${page}`;
+          return `/quick/${status === "completed" ? "finished" : status
+            }?order_by=${sort}&page=${page}`;
         }
 
         if (search) {
@@ -276,8 +275,8 @@ const kuramanimeController = {
         (query?.sort === "a-z"
           ? "ascending"
           : query?.sort === "z-a"
-          ? "descending"
-          : query?.sort) || "latest";
+            ? "descending"
+            : query?.sort) || "latest";
       const pathname = `/properties/${propertyType}/${propertyId}?order_by=${sort}&page=${page}`;
       const document = await kuramanimeScraper.scrapeDOM(pathname, baseUrl);
       const animeList = kuramanimeParser.parseAnimes(document);
@@ -353,7 +352,19 @@ const kuramanimeController = {
       const mainPathname = `anime/${params.animeId}/${params.animeSlug}/episode/${params.episodeId}`;
       const secret = await kuramanimeScraper.scrapeSecret(`${baseUrl}/${mainPathname}`);
       const pathname = `${mainPathname}?Ub3BzhijicHXZdv=${secret}&C2XAPerzX1BM7V9=kuramadrive&page=1`;
-      const document = await kuramanimeScraper.scrapeDOM(pathname, baseUrl);
+
+      // Get session cookie first (required for the AJAX request to succeed)
+      const { cookie, xsrfToken } = await kuramanimeScraper.scrapeSessionCookie(mainPathname);
+
+      // Update Referer to be the Episode Page URL, not just Base URL
+      const fullReferer = `${baseUrl}/${mainPathname}`;
+
+      const document = await kuramanimeScraper.scrapeDOM(pathname, fullReferer, false, {
+        "X-Requested-With": "XMLHttpRequest",
+        "X-XSRF-TOKEN": xsrfToken,
+        "Origin": baseUrl,
+        "Cookie": cookie,
+      });
       const details = kuramanimeParser.parseEpisodeDetails(document, params);
       const payload = setPayload(res, {
         data: { details },

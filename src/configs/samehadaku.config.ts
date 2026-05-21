@@ -1,5 +1,5 @@
 const samehadakuConfig: IAnimeConfig = {
-  baseUrl: "https://v1.samehadaku.how",
+  baseUrl: process.env.SAMEHADAKU_BASE_URL || "https://v1.samehadaku.how",
 };
 
 export default samehadakuConfig;

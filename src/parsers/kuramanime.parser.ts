@@ -282,7 +282,7 @@ const kuramanimeParser = {
 
   parseEpisodeDetails(
     document: HTMLElement,
-    { animeId, animeSlug }: v.InferOutput<typeof kuramanimeSchema.param.episodeDetails>
+    { animeId, animeSlug, episodeId }: v.InferOutput<typeof kuramanimeSchema.param.episodeDetails>
   ): T.IEpisodeDetails {
     const episodeTitleEl = document.querySelector(".breadcrumb__links #episodeTitle");
     const prevEpisodeEl = document.querySelector(".episode__navigations a:first-child");
@@ -372,7 +372,7 @@ const kuramanimeParser = {
       hasNextEpisode: nextEpisode ? true : false,
       episode: {
         first: 1,
-        last: 1,
+        last: Number(episodeId) || 1,
       },
       server,
       download,

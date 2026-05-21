@@ -14,62 +14,69 @@ export default async function getHTML(
   baseUrl: string,
   pathname: string,
   ref?: string,
-  sanitize = false
+  sanitize = false,
+  headers: Record<string, string> = {}
 ): Promise<string> {
-  
-  // 1. URL LOGIC: PAKSA TAMBAH GARIS MIRING (/)
-  // Ini kuncinya bang. Kalau ini gak ada, lu kena redirect -> header ilang -> 403.
+
   let cleanPath = pathname;
   if (cleanPath.includes("/anime/") && !cleanPath.endsWith("/")) {
     cleanPath += "/";
   }
 
-  // 2. Gabungin URL Target
   const targetUrl = new URL(cleanPath, baseUrl).toString();
-  
-  // 3. Bungkus pake AllOrigins Proxy
-  const finalUrl = `${PROXY_BASE}${encodeURIComponent(targetUrl)}`;
 
-  console.log(`[PROXY AllOrigins] Fetching: ${targetUrl}`);
-
+  // 1. TRY DIRECT FETCH FIRST (Local IP usually cleaner)
   try {
-    // Fetch ke Proxy
-    const response = await fetch(finalUrl);
+    console.log(`[DIRECT] Fetching: ${targetUrl}`);
+    const response = await fetch(targetUrl, {
+      headers: {
+        "User-Agent": userAgent,
+        "Referer": baseUrl,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        ...headers,
+      }
+    });
 
     if (!response.ok) {
-        console.error(`[PROXY FAIL] ${response.status}`);
-        // Kalau proxy gagal, coba tembak langsung (sebagai cadangan)
-        const directResp = await fetch(targetUrl, {
-            headers: { "User-Agent": userAgent }
-        });
-        if (!directResp.ok) {
-             directResp.status > 399 ? errorinCuy(directResp.status) : errorinCuy(404);
-        }
-        return processResponse(directResp, sanitize);
+      throw new Error(`Direct Fetch Failed: ${response.status}`);
     }
 
     return processResponse(response, sanitize);
 
-  } catch (err) {
-    console.error("[FETCH ERROR]", err);
-    throw err;
+  } catch (directError) {
+    console.warn(`[DIRECT FAIL] ${directError}. Switch to Proxy...`);
+
+    // 2. FALLBACK TO PROXY
+    const finalUrl = `${PROXY_BASE}${encodeURIComponent(targetUrl)}`;
+    try {
+      const response = await fetch(finalUrl);
+      if (!response.ok) {
+        console.error(`[PROXY FAIL] ${response.status}`);
+        response.status > 399 ? errorinCuy(response.status) : errorinCuy(404);
+      }
+      return processResponse(response, sanitize);
+    } catch (proxyError) {
+      console.error("[ALL FETCH FAILED]", proxyError);
+      throw proxyError;
+    }
   }
 }
 
 async function processResponse(response: Response, sanitize: boolean) {
-    const html = await response.text();
-    if (!html.trim()) errorinCuy(404, "Empty HTML");
+  const html = await response.text();
+  if (!html.trim()) errorinCuy(404, "Empty HTML");
 
-    if (sanitize) {
-      return sanitizeHtml(html, {
-        allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "iframe"]),
-        allowedAttributes: {
-          ...sanitizeHtml.defaults.allowedAttributes,
-          iframe: ["src", "width", "height"],
-          img: ["src", "alt"],
-          "*": ["class", "id"],
-        },
-      });
-    }
-    return html;
+  if (sanitize) {
+    return sanitizeHtml(html, {
+      allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "iframe"]),
+      allowedAttributes: {
+        ...sanitizeHtml.defaults.allowedAttributes,
+        iframe: ["src", "width", "height"],
+        img: ["src", "alt"],
+        "*": ["class", "id"],
+      },
+    });
+  }
+  return html;
 }
