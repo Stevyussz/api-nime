@@ -323,8 +323,13 @@ const otakudesuParser = {
 
     const getInfo = otakudesuExtraParser.parseInfo(document.querySelectorAll(".infozingle b"));
 
+    const title = getInfo(0);
+    if (!title && !document.querySelector(".fotoanime img")) {
+      throw errorinCuy(404);
+    }
+
     return {
-      title: getInfo(0),
+      title,
       japanese: getInfo(1),
       score: getInfo(2),
       producers: getInfo(3),
@@ -431,6 +436,11 @@ const otakudesuParser = {
     const animeId = Id(
       document.querySelector(".alert-info")?.lastElementChild?.querySelector("a")!
     );
+
+    if (!title && !animeId) {
+       throw errorinCuy(404);
+    }
+
     const releaseTime = Text(document.querySelector(".kategoz .fa-clock-o")?.nextElementSibling!)
       .replace(/Release on /g, "")
       .toUpperCase();
