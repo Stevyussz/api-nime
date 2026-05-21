@@ -98,7 +98,7 @@ const samehadakuScraper = {
           operatingSystems: ["windows"],
         },
       });
-      return JSON.parse(response.body) as { data: string };
+      return { data: response.body };
     } catch (e) {
       return {};
     }

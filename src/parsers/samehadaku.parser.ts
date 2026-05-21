@@ -12,68 +12,66 @@ const { Text, Attr, Id, Num, Src, AnimeSrc } = mainParser;
 
 const samehadakuParser = {
   parseHome(document: HTMLElement): T.IHome {
-    const parentElems = document.querySelectorAll(".venz");
-    const ongoingAnimeElems = parentElems[0]?.querySelectorAll("ul li");
-    const completedAnimeElems = parentElems[1]?.querySelectorAll("ul li");
-
-    function getSource(index: number) {
-      return AnimeSrc(parentElems[index]?.previousElementSibling || null);
-    }
-
+    // Ongoing is in .post-show ul li
+    const ongoingAnimeElems = document.querySelectorAll(".post-show ul li");
+    
     const ongoingAnimeList: T.IOngoingAnimeCard[] =
-      ongoingAnimeElems?.map((el) => samehadakuExtraParser.parseOngoingCard(el)) || [];
-
-    const completedAnimeList: T.ICompletedAnimeCard[] =
-      completedAnimeElems?.map((el) => samehadakuExtraParser.parseCompletedCard(el)) || [];
+      ongoingAnimeElems.map((el) => samehadakuExtraParser.parseOngoingCard(el));
 
     return {
-      ongoing: { samehadakuUrl: getSource(0), animeList: ongoingAnimeList },
-      completed: { samehadakuUrl: getSource(1), animeList: completedAnimeList },
+      ongoing: { samehadakuUrl: baseUrl, animeList: ongoingAnimeList },
+      completed: { samehadakuUrl: baseUrl, animeList: [] }, // V2 removed completed from home
     };
   },
 
   parseSchedules(document: HTMLElement): T.IScheduleCollection[] {
-    const scheduleElems = document.querySelectorAll(".kglist321");
-    const list: T.IScheduleCollection[] = scheduleElems.map((el) => {
-      const title = Text(el.querySelector("h2"));
-      const animeElems = el.querySelectorAll("ul li a");
-      const animeList: T.ITextAnimeCard[] = animeElems.map((a) => {
-        const { id, title, samehadakuUrl } = samehadakuExtraParser.parseTextCard(a);
-        return { title, animeId: id, samehadakuUrl };
-      });
-      return { title, animeList };
-    });
-
-    if (list.length === 0) throw errorinCuy(404);
-    return list;
+    // Schedule is handled via AJAX in v2, so we return empty to let the frontend normalizer fallback
+    return [];
   },
 
   parseOngoingAnimes(document: HTMLElement): T.IOngoingAnimeCard[] {
-    const animeElems = document.querySelectorAll(".venz ul li");
-    const list = animeElems.map((el) => samehadakuExtraParser.parseOngoingCard(el));
+    const animeElems = document.querySelectorAll(".animepost");
+    const list = animeElems.map((el) => {
+       const title = Text(el.querySelector(".title h2") ?? el.querySelector(".title h4"));
+       const poster = Src(el.querySelector("img"));
+       const otakudesuUrl = AnimeSrc(el.querySelector("a"));
+       const animeId = Id(el.querySelector("a"));
+       const releaseDay = Text(el.querySelector(".type"));
+       return {
+         title, poster, episodes: "Unknown", animeId, latestReleaseDate: "Unknown", releaseDay, samehadakuUrl: otakudesuUrl
+       };
+    });
     if (list.length === 0) throw errorinCuy(404);
     return list;
   },
 
   parseCompletedAnimes(document: HTMLElement): T.ICompletedAnimeCard[] {
-    const animeElems = document.querySelectorAll(".venz ul li");
-    const list = animeElems.map((el) => samehadakuExtraParser.parseCompletedCard(el));
+    const animeElems = document.querySelectorAll(".animepost");
+    const list = animeElems.map((el) => {
+       const title = Text(el.querySelector(".title h2") ?? el.querySelector(".title h4"));
+       const poster = Src(el.querySelector("img"));
+       const otakudesuUrl = AnimeSrc(el.querySelector("a"));
+       const animeId = Id(el.querySelector("a"));
+       const score = Text(el.querySelector(".score"));
+       return {
+         title, poster, episodes: "Unknown", animeId, score, lastReleaseDate: "Unknown", samehadakuUrl: otakudesuUrl
+       };
+    });
     if (list.length === 0) throw errorinCuy(404);
     return list;
   },
 
   parseSearchedAnimes(document: HTMLElement): T.ISearchedAnimeCard[] {
-    const animeElems = document.querySelectorAll("ul.chivsrc li");
+    const animeElems = document.querySelectorAll(".animepost");
     const list: T.ISearchedAnimeCard[] = animeElems.map((el) => {
-      const genreElems =
-        el.lastElementChild?.previousElementSibling?.previousElementSibling?.querySelectorAll("a") ?? [];
+      const genreElems = el.querySelectorAll(".genres .mta a");
       const genreList = samehadakuExtraParser.parseTextGenreList(genreElems);
       return {
-        title: Text(el.querySelector("h2")),
+        title: Text(el.querySelector(".title h2") ?? el.querySelector(".title h4")),
         animeId: Id(el.querySelector("a")),
         poster: Src(el.querySelector("img")),
-        score: Text(el.lastElementChild!),
-        status: Text(el.lastElementChild?.previousElementSibling!),
+        score: Text(el.querySelector(".score")),
+        status: Text(el.querySelector(".data .type") ?? el.querySelector(".type")),
         samehadakuUrl: AnimeSrc(el.querySelector("a")),
         genreList,
       };
@@ -109,56 +107,58 @@ const samehadakuParser = {
   },
 
   parseAnimeDetails(document: HTMLElement): T.IAnimeDetails {
-    const paragraphElems = document.querySelectorAll(".sinopc p");
-    const synopsis = samehadakuExtraParser.parseSynopsis(paragraphElems);
-    const headerTitleElems = document.querySelectorAll(".smokelister");
+    const title = Text(document.querySelector(".entry-title"));
+    if (!title) throw errorinCuy(404);
 
-    let batch: T.ITextBatchCard | null = null;
-    let episodeList: T.ITextEpisodeCard[] = [];
+    const infoElems = document.querySelectorAll(".spe span");
+    const getInfo = (key: string) => {
+        const found = infoElems.find(el => el.text.toLowerCase().includes(key.toLowerCase()));
+        return found ? found.text.replace(/.*(?::|\b)/, "").trim() : "Unknown";
+    };
 
-    for (const headerEl of headerTitleElems) {
-      if (headerEl.text.toLowerCase().includes("batch")) {
-        const batchEl = headerEl.nextElementSibling?.querySelector("a");
-        if (batchEl) {
-          batch = {
-            title: Text(batchEl),
-            batchId: Id(batchEl),
-            samehadakuUrl: AnimeSrc(batchEl),
-          };
-          break;
-        }
-      }
-    }
+    const status = getInfo("Status");
+    const score = getInfo("Score");
 
-    for (const headerEl of headerTitleElems) {
-      if (!headerEl.text.toLowerCase().includes("batch") && headerEl.text.toLowerCase().includes("episode")) {
-        const episodeElems = headerEl.nextElementSibling?.querySelectorAll("li a");
-        if (episodeElems) {
-          episodeList = samehadakuExtraParser.parseTextEpisodeList(episodeElems);
-          break;
-        }
-      }
-    }
+    const studioElems = document.querySelectorAll(".spe span b").filter(b => b.text.includes("Studio"));
+    const studioList = studioElems.length > 0 ? samehadakuExtraParser.parseTextGenreList(studioElems[0].parentNode?.querySelectorAll("a") || []) : [];
 
-    const genreParEl = document.querySelector(".infozingle")?.lastElementChild;
-    const genreElems = genreParEl?.querySelectorAll("a") || [];
+    const genreElems = document.querySelectorAll(".genre-info a");
     const genreList = samehadakuExtraParser.parseTextGenreList(genreElems);
-    const getInfo = samehadakuExtraParser.parseInfo(document.querySelectorAll(".infozingle b"));
+
+    const synopsisElems = document.querySelectorAll(".desc .entry-content p");
+    const synopsis = samehadakuExtraParser.parseSynopsis(synopsisElems);
+
+    const batchElems = document.querySelectorAll(".listbatch a");
+    const batchList = batchElems.map((el) => {
+      const { id, title, samehadakuUrl } = samehadakuExtraParser.parseTextCard(el);
+      return { title, batchId: id, samehadakuUrl };
+    });
+
+    const episodeLinks = document.querySelectorAll("a").filter(a => a.getAttribute("href")?.includes("-episode-") && !a.classNames.includes("play-new-episode"));
+    const uniqueEpisodesMap = new Map();
+    episodeLinks.forEach(a => {
+        const href = a.getAttribute("href") || "";
+        if (!uniqueEpisodesMap.has(href)) {
+           uniqueEpisodesMap.set(href, a);
+        }
+    });
+    
+    const episodeList = samehadakuExtraParser.parseTextEpisodeList(Array.from(uniqueEpisodesMap.values())).reverse();
 
     return {
-      title: getInfo(0),
-      japanese: getInfo(1),
-      score: getInfo(2),
-      producers: getInfo(3),
-      type: getInfo(4),
-      status: getInfo(5),
-      episodes: getInfo(6),
-      duration: getInfo(7),
-      aired: getInfo(8),
-      studios: getInfo(9),
-      poster: Src(document.querySelector(".fotoanime img")),
+      title,
+      japanese: getInfo("Japanese"),
+      score,
+      producers: getInfo("Producers"),
+      type: getInfo("Type"),
+      status,
+      episodes: getInfo("Total Episode"),
+      duration: getInfo("Duration"),
+      aired: getInfo("Released"),
+      studios: studioList.map(s => s.title).join(", ") || "Unknown",
+      poster: Src(document.querySelector(".thumb img") ?? document.querySelector("img")),
       synopsis,
-      batch,
+      batch: batchList.length > 0 ? { title: batchList[0].title, batchId: batchList[0].batchId, samehadakuUrl: batchList[0].samehadakuUrl } : null,
       genreList,
       episodeList,
     };
@@ -208,30 +208,30 @@ const samehadakuParser = {
   },
 
   async parseEpisodeDetails(document: HTMLElement, url: string): Promise<T.IEpisodeDetails> {
-    const navigationElems = document.querySelectorAll(".flir a");
+    const title = Text(document.querySelector(".entry-title"));
+    if (!title) throw errorinCuy(404);
+
+    const animeIdUrl = document.querySelector(".imo, .infox, .breadcrumb")?.querySelectorAll("a").find(a => a.getAttribute("href")?.includes("/anime/"))?.getAttribute("href") || "";
+    const animeId = animeIdUrl.replace(/.*\/anime\//, "").replace(/\//g, "");
+
+    const navigationElems = document.querySelectorAll(".nvs a, .nextprev a, .item-nav a");
     let prevEpisode: T.ITextEpisodeCard | null = null;
     let nextEpisode: T.ITextEpisodeCard | null = null;
 
-    navigationElems.forEach((el) => {
-      const navTitle = el.text;
-      const navObj: T.ITextEpisodeCard = {
-        title: navTitle,
-        episodeId: Id(el),
-        samehadakuUrl: AnimeSrc(el),
-      };
-      if (navTitle.toLowerCase().includes("prev")) {
-        prevEpisode = { ...navObj, title: "Prev" };
-      } else if (navTitle.toLowerCase().includes("next")) {
-        nextEpisode = { ...navObj, title: "Next" };
-      }
-    });
+    if (navigationElems.length >= 3) {
+      const prevUrl = navigationElems[0]?.getAttribute("href");
+      if (prevUrl && prevUrl !== "#") prevEpisode = { title: "Prev", episodeId: prevUrl.replace(/.*\//, "").replace(/\//g, ""), samehadakuUrl: prevUrl };
+      
+      const nextUrl = navigationElems[2]?.getAttribute("href");
+      if (nextUrl && nextUrl !== "#") nextEpisode = { title: "Next", episodeId: nextUrl.replace(/.*\//, "").replace(/\//g, ""), samehadakuUrl: nextUrl };
+    }
 
-    const downloadElems = document.querySelectorAll(".download ul li");
+    const downloadElems = document.querySelectorAll(".download-eps, .mctnx, .soraddlx");
     const download: IFormat = {
       title: "Download",
       qualityList: downloadElems.map((el) => {
-        const title = Text(el.querySelector("strong"));
-        const size = Text(el.querySelector("i"));
+        const title = Text(el.querySelector("strong, .sorattlx"));
+        const size = "Unknown";
         const urlList: IUrl[] = el.querySelectorAll("a").map((urlEl) => ({
           title: Text(urlEl),
           url: Attr(urlEl, "href"),
@@ -240,60 +240,44 @@ const samehadakuParser = {
       }),
     };
 
-    const credentials = [
-      ...new Set([...document.innerText.matchAll(/action:"([^"]+)"/g)].map((m) => m[1])),
-    ];
+    const serverElems = document.querySelectorAll(".east_player_option");
+    const serverList: IServer[] = serverElems.map((el) => {
+        const title = Text(el.querySelector("span"));
+        const post = Attr(el, "data-post");
+        const nume = Attr(el, "data-nume");
+        const type = Attr(el, "data-type");
+        const serverIdObj = { action: "player_ajax", post, nume, type };
+        return {
+           title,
+           serverId: Buffer.from(JSON.stringify(serverIdObj)).toString("base64url"),
+        };
+    });
 
-    const nonceBody = new URLSearchParams({ action: credentials[1] || "" });
-    const nonce = await samehadakuScraper.scrapeNonce(nonceBody.toString(), url);
-
-    const serverElems = document.querySelectorAll(".mirrorstream > ul");
     const server: IFormat = {
       title: "Server",
-      qualityList: serverElems.map((serverEl) => {
-        const title = serverEl.querySelector("li")?.previousSibling?.text || "";
-        const serverList: IServer[] = serverEl.querySelectorAll("li a[data-content]").map((el) => {
-          const serverId = Attr(el, "data-content");
-          const decoded = {
-            ...JSON.parse(Buffer.from(serverId, "base64").toString()),
-            nonce: nonce.data || "",
-            action: credentials[0],
-            referer: url,
-          };
-          return {
-            title: Text(el),
-            serverId: Buffer.from(JSON.stringify(decoded), "utf-8").toString("base64url"),
-          };
-        });
-        return { title, serverList };
-      }),
+      qualityList: [{ title: "Streaming", size: "Auto", urlList: serverList as any }],
     };
-
-    const title = Text(document.querySelector(".venutama h1.posttl"));
-    const animeId = Id(document.querySelector(".alert-info")?.lastElementChild?.querySelector("a")!);
-    const defaultStreamingUrl = Src(document.querySelector(".player-embed iframe"));
 
     return {
       title,
       animeId,
-      poster: Src(document.querySelector(".fotoanime img")),
-      defaultStreamingUrl,
+      poster: Src(document.querySelector(".fotoanime img") ?? document.querySelector("img")),
+      defaultStreamingUrl: "",
       hasPrevEpisode: !!prevEpisode,
       prevEpisode,
       hasNextEpisode: !!nextEpisode,
       nextEpisode,
-      server,
-      download,
+      server: server as any,
+      download: download as any,
     };
   },
 
   async parseServerDetails(serverId: string): Promise<T.IServerDetails> {
     const serverIdObj = JSON.parse(Buffer.from(serverId, "base64").toString());
-    const referer = serverIdObj?.referer;
-    delete serverIdObj["referer"];
     const serverBody = new URLSearchParams(serverIdObj);
-    const server = await samehadakuScraper.scrapeServer(serverBody.toString(), referer);
-    const url = generateSrcFromIframeTag(Buffer.from(server.data || "", "base64").toString());
+    const server = await samehadakuScraper.scrapeServer(serverBody.toString(), baseUrl);
+    // The response is an iframe html. Extract its src.
+    const url = generateSrcFromIframeTag(server.data || (server as any) || "");
     return { url };
   },
 

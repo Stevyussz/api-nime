@@ -8,13 +8,25 @@ const { baseUrl } = samehadakuConfig;
 
 const samehadakuExtraParser = {
   parseOngoingCard(el: HTMLElement): T.IOngoingAnimeCard {
-    const title = Text(el.querySelector("h2.jdlflm") ?? el.querySelector(".title"));
-    const poster = Src(el.querySelector(".thumbz img") ?? el.querySelector("img"));
-    const episodes = Text(el.querySelector(".epz"), /Episode (\S+)/);
-    const otakudesuUrl = AnimeSrc(el.querySelector(".thumb a") ?? el.querySelector("a"));
-    const animeId = Id(el.querySelector(".thumb a") ?? el.querySelector("a"));
-    const latestReleaseDate = Text(el.querySelector(".newnime") ?? el.querySelector(".date"));
-    const releaseDay = Text(el.querySelector(".epztipe") ?? el.querySelector(".type"));
+    const title = Text(el.querySelector(".entry-title") ?? el.querySelector("h2.jdlflm") ?? el.querySelector(".title"));
+    const poster = Src(el.querySelector("img.npws") ?? el.querySelector(".thumbz img") ?? el.querySelector("img"));
+    
+    // Find spans for episode and date
+    const spans = el.querySelectorAll("span");
+    const epSpan = spans.find(s => s.text.includes("Episode"));
+    const dateSpan = spans.find(s => s.text.includes("Released on"));
+    
+    let episodes = "Unknown";
+    if (epSpan) {
+       const authorText = epSpan.querySelector("author")?.text.trim();
+       if (authorText) episodes = authorText;
+       else episodes = Text(epSpan, /Episode\s*(\S+)/) || "Unknown";
+    }
+
+    const otakudesuUrl = AnimeSrc(el.querySelector(".entry-title a") ?? el.querySelector(".thumb a") ?? el.querySelector("a"));
+    const animeId = Id(el.querySelector(".entry-title a") ?? el.querySelector(".thumb a") ?? el.querySelector("a"));
+    const latestReleaseDate = dateSpan ? dateSpan.text.replace(/.*Released on:\s*/i, "").trim() : "Unknown";
+    const releaseDay = "Unknown"; // Not immediately visible in v2 list
 
     return {
       title,
@@ -28,22 +40,15 @@ const samehadakuExtraParser = {
   },
 
   parseCompletedCard(el: HTMLElement): T.ICompletedAnimeCard {
-    const title = Text(el.querySelector("h2.jdlflm") ?? el.querySelector(".title"));
-    const poster = Src(el.querySelector(".thumbz img") ?? el.querySelector("img"));
-    const episodes = Text(el.querySelector(".epz"), /(\S+) Episode/);
-    const samehadakuUrl = AnimeSrc(el.querySelector(".thumb a") ?? el.querySelector("a"));
-    const animeId = Id(el.querySelector(".thumb a") ?? el.querySelector("a"));
-    const score = Text(el.querySelector(".epztipe") ?? el.querySelector(".score"));
-    const lastReleaseDate = Text(el.querySelector(".newnime") ?? el.querySelector(".date"));
-
+    const ongoing = this.parseOngoingCard(el);
     return {
-      title,
-      poster,
-      episodes,
-      animeId,
-      score,
-      lastReleaseDate,
-      samehadakuUrl,
+      title: ongoing.title,
+      poster: ongoing.poster,
+      episodes: ongoing.episodes,
+      animeId: ongoing.animeId,
+      score: "Unknown", // Score usually not present in the main list anymore
+      lastReleaseDate: ongoing.latestReleaseDate,
+      samehadakuUrl: ongoing.samehadakuUrl,
     };
   },
 
@@ -71,9 +76,9 @@ const samehadakuExtraParser = {
   parseTextEpisodeList(elems: HTMLElement[]): T.ITextEpisodeCard[] {
     return elems.map((el) => {
       const { id, title, samehadakuUrl } = samehadakuExtraParser.parseTextCard(el);
-      const match = title.match(/Episode\s+(\d+)/);
+      const match = title.match(/(?:Episode\s+)?(\d+(?:\.\d+)?)/i) || id.match(/-episode-(\d+(?:\.\d+)?)/i);
       return {
-        title: match ? match[1] || "0" : title,
+        title: match ? match[1] || "0" : title.replace(/.*Episode\s*/i, ""),
         episodeId: id,
         samehadakuUrl,
       };

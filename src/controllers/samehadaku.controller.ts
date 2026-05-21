@@ -126,7 +126,7 @@ const samehadakuController = {
   async getOngoingAnimes(req: Request, res: Response, next: NextFunction) {
     try {
       const page = Number(v.parse(samehadakuSchema.query.animes, req.query)?.page) || 1;
-      const pathname = page > 1 ? `/ongoing-anime/page/${page}/` : "/ongoing-anime/";
+      const pathname = page > 1 ? `/anime-terbaru/page/${page}/` : "/anime-terbaru/";
       const document = await samehadakuScraper.scrapeDOM(pathname, baseUrl);
       const animeList = samehadakuParser.parseOngoingAnimes(document);
       const pagination = samehadakuParser.parsePagination(document);
@@ -139,7 +139,7 @@ const samehadakuController = {
   async getCompletedAnimes(req: Request, res: Response, next: NextFunction) {
     try {
       const page = Number(v.parse(samehadakuSchema.query.animes, req.query)?.page) || 1;
-      const pathname = page > 1 ? `/complete-anime/page/${page}/` : "/complete-anime/";
+      const pathname = page > 1 ? `/anime-tamat/page/${page}/` : "/anime-tamat/";
       const document = await samehadakuScraper.scrapeDOM(pathname, baseUrl);
       const animeList = samehadakuParser.parseCompletedAnimes(document);
       const pagination = samehadakuParser.parsePagination(document);
@@ -165,7 +165,7 @@ const samehadakuController = {
     try {
       const genreId = req.params.genreId;
       const page = Number(v.parse(samehadakuSchema.query.animes, req.query)?.page) || 1;
-      const pathname = page > 1 ? `/genres/${genreId}/page/${page}/` : `/genres/${genreId}/`;
+      const pathname = page > 1 ? `/genre/${genreId}/page/${page}/` : `/genre/${genreId}/`;
       const document = await samehadakuScraper.scrapeDOM(pathname, baseUrl);
       const animeList = samehadakuParser.parseAnimesByGenre(document);
       const pagination = samehadakuParser.parsePagination(document);
@@ -202,7 +202,7 @@ const samehadakuController = {
   async getEpisodeDetails(req: Request, res: Response, next: NextFunction) {
     try {
       const episodeId = req.params.episodeId;
-      const pathname = `/episode/${episodeId}/`;
+      const pathname = `/${episodeId}/`;
       const document = await samehadakuScraper.scrapeDOM(pathname, baseUrl);
       const details = await samehadakuParser.parseEpisodeDetails(
         document,
