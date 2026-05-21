@@ -21,8 +21,8 @@ const animesailController = {
 
     async getHome(req: Request, res: Response, next: NextFunction) {
         try {
-            const page = req.query.page || 1;
-            const pathname = `/page/${page}/`;
+            const page = Number(req.query.page) || 1;
+            const pathname = page > 1 ? `/page/${page}/` : "/";
             const document = await animesailScraper.scrapeDOM(pathname, baseUrl);
             const homeData = animesailParser.parseHome(document);
             const list = homeData.latest;
@@ -31,6 +31,7 @@ const animesailController = {
             next(error);
         }
     },
+
 
     async getMovies(req: Request, res: Response, next: NextFunction) {
         try {

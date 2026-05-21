@@ -350,14 +350,15 @@ const kuramanimeController = {
     try {
       const params = v.parse(kuramanimeSchema.param.episodeDetails, req.params);
       const mainPathname = `anime/${params.animeId}/${params.animeSlug}/episode/${params.episodeId}`;
-      const secret = await kuramanimeScraper.scrapeSecret(`${baseUrl}/${mainPathname}`);
-      const pathname = `${mainPathname}?Ub3BzhijicHXZdv=${secret}&C2XAPerzX1BM7V9=kuramadrive&page=1`;
-
-      // Get session cookie first (required for the AJAX request to succeed)
-      const { cookie, xsrfToken } = await kuramanimeScraper.scrapeSessionCookie(mainPathname);
-
-      // Update Referer to be the Episode Page URL, not just Base URL
       const fullReferer = `${baseUrl}/${mainPathname}`;
+
+      // Run secret key fetch + session cookie fetch IN PARALLEL for ~2x speed
+      const [secret, { cookie, xsrfToken }] = await Promise.all([
+        kuramanimeScraper.scrapeSecret(fullReferer),
+        kuramanimeScraper.scrapeSessionCookie(mainPathname),
+      ]);
+
+      const pathname = `${mainPathname}?Ub3BzhijicHXZdv=${secret}&C2XAPerzX1BM7V9=kuramadrive&page=1`;
 
       const document = await kuramanimeScraper.scrapeDOM(pathname, fullReferer, false, {
         "X-Requested-With": "XMLHttpRequest",
@@ -366,15 +367,14 @@ const kuramanimeController = {
         "Cookie": cookie,
       });
       const details = kuramanimeParser.parseEpisodeDetails(document, params);
-      const payload = setPayload(res, {
-        data: { details },
-      });
+      const payload = setPayload(res, { data: { details } });
 
       res.json(payload);
     } catch (error) {
       next(error);
     }
   },
+
 };
 
 export default kuramanimeController;

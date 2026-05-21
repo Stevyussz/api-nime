@@ -1,14 +1,9 @@
 import errorinCuy from "./errorinCuy.js";
 import sanitizeHtml from "sanitize-html";
 
-// Kita ganti proxy pake AllOrigins (Lebih stabil buat text HTML)
-const PROXY_BASE = "https://api.allorigins.win/raw?url=";
-
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
-// Export userAgent biar gak error build di file lain
+// Export userAgent untuk file lain
 export const userAgent =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 export default async function getHTML(
   baseUrl: string,
@@ -17,7 +12,7 @@ export default async function getHTML(
   sanitize = false,
   headers: Record<string, string> = {}
 ): Promise<string> {
-
+  // Normalise path: ensure trailing slash on /anime/ routes
   let cleanPath = pathname;
   if (cleanPath.includes("/anime/") && !cleanPath.endsWith("/")) {
     cleanPath += "/";
@@ -25,47 +20,31 @@ export default async function getHTML(
 
   const targetUrl = new URL(cleanPath, baseUrl).toString();
 
-  // 1. TRY DIRECT FETCH FIRST (Local IP usually cleaner)
-  try {
-    console.log(`[DIRECT] Fetching: ${targetUrl}`);
-    const response = await fetch(targetUrl, {
-      headers: {
-        "User-Agent": userAgent,
-        "Referer": baseUrl,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-        ...headers,
-      }
-    });
+  console.log(`[getHTML] Fetching: ${targetUrl}`);
 
-    if (!response.ok) {
-      throw new Error(`Direct Fetch Failed: ${response.status}`);
-    }
+  const response = await fetch(targetUrl, {
+    headers: {
+      "User-Agent": userAgent,
+      "Referer": ref ?? baseUrl,
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+      "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+      ...headers,
+    },
+    // Node 18+ supports this natively
+    // @ts-ignore — Node fetch signal for timeout
+    signal: AbortSignal.timeout(15000),
+  });
 
-    return processResponse(response, sanitize);
-
-  } catch (directError) {
-    console.warn(`[DIRECT FAIL] ${directError}. Switch to Proxy...`);
-
-    // 2. FALLBACK TO PROXY
-    const finalUrl = `${PROXY_BASE}${encodeURIComponent(targetUrl)}`;
-    try {
-      const response = await fetch(finalUrl);
-      if (!response.ok) {
-        console.error(`[PROXY FAIL] ${response.status}`);
-        response.status > 399 ? errorinCuy(response.status) : errorinCuy(404);
-      }
-      return processResponse(response, sanitize);
-    } catch (proxyError) {
-      console.error("[ALL FETCH FAILED]", proxyError);
-      throw proxyError;
-    }
+  if (!response.ok) {
+    throw errorinCuy(response.status, `getHTML failed: ${response.status} ${response.statusText} — ${targetUrl}`);
   }
+
+  return processResponse(response, sanitize);
 }
 
-async function processResponse(response: Response, sanitize: boolean) {
+async function processResponse(response: Response, sanitize: boolean): Promise<string> {
   const html = await response.text();
-  if (!html.trim()) errorinCuy(404, "Empty HTML");
+  if (!html.trim()) throw errorinCuy(404, "Empty HTML response");
 
   if (sanitize) {
     return sanitizeHtml(html, {
@@ -73,7 +52,7 @@ async function processResponse(response: Response, sanitize: boolean) {
       allowedAttributes: {
         ...sanitizeHtml.defaults.allowedAttributes,
         iframe: ["src", "width", "height"],
-        img: ["src", "alt"],
+        img: ["src", "alt", "data-src"],
         "*": ["class", "id"],
       },
     });

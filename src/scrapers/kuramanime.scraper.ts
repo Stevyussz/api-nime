@@ -1,75 +1,158 @@
 import kuramanimeConfig from "@configs/kuramanime.config.js";
-import getHTML, { userAgent } from "@helpers/getHTML.js";
 import { parse, type HTMLElement } from "node-html-parser";
 
 const { baseUrl } = kuramanimeConfig;
 
-const kuramanimeScraper = {
-  async scrapeDOM(pathname: string, ref?: string, sanitize: boolean = false, headers: Record<string, string> = {}): Promise<HTMLElement> {
-    const html = await getHTML(baseUrl, pathname, ref, sanitize, headers);
+// User-Agent yang terlihat sah untuk Kuramanime
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-    const document = parse(html, {
-      parseNoneClosedTags: true,
+// Re-export untuk kompatibilitas file lain yang import userAgent dari sini
+export const userAgent = UA;
+
+const kuramanimeScraper = {
+  /**
+   * Fetch HTML page dan return parsed HTMLElement.
+   * Menggunakan got-scraping langsung (bukan proxy) untuk reliabilitas.
+   */
+  async scrapeDOM(
+    pathname: string,
+    ref?: string,
+    sanitize: boolean = false,
+    headers: Record<string, string> = {}
+  ): Promise<HTMLElement> {
+    const { gotScraping } = await import("got-scraping");
+
+    const url = new URL(pathname, baseUrl).toString();
+
+    const response = await gotScraping({
+      url,
+      headers: {
+        "Referer": ref ?? baseUrl,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8",
+        ...headers,
+      },
+      headerGeneratorOptions: {
+        browsers: [{ name: "chrome", minVersion: 120 }],
+        devices: ["desktop"],
+        locales: ["id-ID", "id", "en-US"],
+        operatingSystems: ["windows"],
+      },
+      http2: true,
+      https: { rejectUnauthorized: false }, // Kuramanime sering expired cert
+      throwHttpErrors: true,
+      timeout: { request: 15000 },
+      retry: { limit: 2 },
     });
 
-    return document;
+    return parse(response.body, { parseNoneClosedTags: true });
   },
 
+  /**
+   * Scrape secret key dari file .txt Kuramanime.
+   * Digunakan untuk unlock episode/batch pages.
+   */
   async scrapeSecret(ref?: string): Promise<string> {
-    const text = await getHTML(baseUrl, "/assets/Ks6sqSgloPTlHMl.txt", ref);
+    const { gotScraping } = await import("got-scraping");
 
-    return text;
+    try {
+      const url = new URL("/assets/Ks6sqSgloPTlHMl.txt", baseUrl).toString();
+      const response = await gotScraping({
+        url,
+        headers: {
+          "Referer": ref ?? baseUrl,
+          "Accept": "text/plain,*/*;q=0.8",
+        },
+        headerGeneratorOptions: {
+          browsers: [{ name: "chrome", minVersion: 120 }],
+          devices: ["desktop"],
+          locales: ["id-ID"],
+          operatingSystems: ["windows"],
+        },
+        http2: true,
+        https: { rejectUnauthorized: false },
+        throwHttpErrors: true,
+        timeout: { request: 8000 },
+        retry: { limit: 1 },
+      });
+
+      const secret = response.body.trim();
+      console.log("[Kuramanime] Secret fetched:", secret.slice(0, 20) + "...");
+      return secret;
+    } catch (e: any) {
+      console.warn("[Kuramanime] Failed to fetch secret key:", e.message);
+      return ""; // Graceful fallback
+    }
   },
 
+  /**
+   * Ambil session cookie (XSRF-TOKEN + Laravel session) dari halaman episode.
+   * Diperlukan agar request AJAX ke episode berhasil.
+   */
   async scrapeSessionCookie(pathname: string): Promise<{ cookie: string; xsrfToken: string }> {
     const targetUrl = new URL(pathname, baseUrl).toString();
 
     try {
-      const response = await fetch(targetUrl, {
+      const { gotScraping } = await import("got-scraping");
+
+      // Fetch dengan redirect: manual agar bisa ambil Set-Cookie header
+      const response = await gotScraping({
+        url: targetUrl,
         method: "GET",
         headers: {
-          "User-Agent": userAgent,
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
-        redirect: "manual",
+        headerGeneratorOptions: {
+          browsers: [{ name: "chrome", minVersion: 120 }],
+          devices: ["desktop"],
+          locales: ["id-ID"],
+          operatingSystems: ["windows"],
+        },
+        http2: true,
+        https: { rejectUnauthorized: false },
+        throwHttpErrors: false,
+        followRedirect: false, // manual redirect agar Set-Cookie tersedia
+        timeout: { request: 10000 },
+        retry: { limit: 0 },
       });
 
-      const cookieHeader = response.headers.get("set-cookie");
+      // got-scraping returns headers as object; get set-cookie
+      const rawSetCookie = response.headers["set-cookie"];
+      if (!rawSetCookie) return { cookie: "", xsrfToken: "" };
 
-      if (!cookieHeader) return { cookie: "", xsrfToken: "" };
-
-      // Extract all cookies (name=value) and ignore attributes
-      // Set-Cookie header is a string, possibly joined by comma.
-      // We accept that "Expires=Day, Date..." might be split incorrectly by comma, 
-      // but we look for "Key=Value" where Key is NOT a reserved attribute.
-
-      // Split by comma (rough split)
-      const rawParts = (cookieHeader || "").split(/,(?=\s*\w+=)/);
-      // This regex split looks for comma followed by "Key=". 
-      // It handles "Expires=Mon, 29..." because ", 29" is not ", Key=".
+      // Normalize: rawSetCookie bisa berupa string[] (got) atau string (node fetch)
+      const cookieLines: string[] = Array.isArray(rawSetCookie)
+        ? rawSetCookie
+        : [rawSetCookie];
 
       const cookies: string[] = [];
       let xsrfToken = "";
 
       const reserved = /^(path|domain|expires|max-age|secure|httponly|samesite)$/i;
 
-      for (const part of rawParts) {
-        const firstSemi = (part.split(";")[0] ?? "").trim();
-        const [key, val] = firstSemi.split("=");
+      for (const line of cookieLines) {
+        // Setiap line adalah satu Set-Cookie header yang sudah dipisah
+        const firstSemi = (line.split(";")[0] ?? "").trim();
+        const eqIdx = firstSemi.indexOf("=");
+        if (eqIdx === -1) continue;
+
+        const key = firstSemi.slice(0, eqIdx).trim();
+        const val = firstSemi.slice(eqIdx + 1).trim();
+
         if (key && !reserved.test(key)) {
-          cookies.push(firstSemi);
+          cookies.push(`${key}=${val}`);
           if (key === "XSRF-TOKEN") {
-            xsrfToken = decodeURIComponent(val ?? "");
+            xsrfToken = decodeURIComponent(val);
           }
         }
       }
 
       const sessionCookie = cookies.join("; ");
-
-      console.log("[Kuramanime] Captured Cookies:", sessionCookie);
+      console.log("[Kuramanime] Cookies captured:", sessionCookie.slice(0, 60) + "...");
 
       return { cookie: sessionCookie, xsrfToken };
     } catch (e: any) {
-      console.warn("[Kuramanime] Failed to get session cookie:", e);
+      console.warn("[Kuramanime] Failed to get session cookie:", e.message);
       return { cookie: "", xsrfToken: "" };
     }
   },
