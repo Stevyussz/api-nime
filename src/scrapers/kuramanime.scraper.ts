@@ -1,5 +1,6 @@
 import kuramanimeConfig from "@configs/kuramanime.config.js";
 import { parse, type HTMLElement } from "node-html-parser";
+import { proxyFetch, isVercel } from "@helpers/proxyFetch.js";
 
 const { baseUrl } = kuramanimeConfig;
 
@@ -20,9 +21,25 @@ const kuramanimeScraper = {
     sanitize: boolean = false,
     headers: Record<string, string> = {}
   ): Promise<HTMLElement> {
-    const { gotScraping } = await import("got-scraping");
-
     const url = new URL(pathname, baseUrl).toString();
+
+    // Di Vercel: route melalui CF Worker proxy (bypass IP blacklist)
+    if (isVercel) {
+      const res = await proxyFetch(url, {
+        headers: {
+          "Referer":  ref ?? baseUrl,
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+          ...headers,
+        },
+      });
+
+      if (!res.ok) throw new Error(`Kuramanime DOM: HTTP ${res.status} for ${url}`);
+      const body = await res.text();
+      return parse(body, { parseNoneClosedTags: true });
+    }
+
+    // Localhost: got-scraping langsung (fingerprinting lebih baik)
+    const { gotScraping } = await import("got-scraping");
 
     const response = await gotScraping({
       url,
@@ -93,6 +110,28 @@ const kuramanimeScraper = {
     const targetUrl = new URL(pathname, baseUrl).toString();
 
     try {
+      // Di Vercel: pakai proxyFetch
+      if (isVercel) {
+        const res = await proxyFetch(targetUrl, { headers: {} });
+        const rawCookie = res.headers.get("x-set-cookie") || res.headers.get("set-cookie") || "";
+
+        const cookies: string[] = [];
+        let xsrfToken = "";
+        const reserved = /^(path|domain|expires|max-age|secure|httponly|samesite)$/i;
+
+        for (const line of rawCookie.split(", ")) {
+          const firstSemi = (line.split(";")[0] ?? "").trim();
+          const eqIdx = firstSemi.indexOf("=");
+          if (eqIdx === -1) continue;
+          const key = firstSemi.slice(0, eqIdx).trim();
+          const val = firstSemi.slice(eqIdx + 1).trim();
+          if (key && !reserved.test(key)) {
+            cookies.push(`${key}=${val}`);
+            if (key === "XSRF-TOKEN") xsrfToken = decodeURIComponent(val);
+          }
+        }
+        return { cookie: cookies.join("; "), xsrfToken };
+      }
       const { gotScraping } = await import("got-scraping");
 
       // Fetch dengan redirect: manual agar bisa ambil Set-Cookie header

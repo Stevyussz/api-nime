@@ -1,12 +1,11 @@
 import samehadakuConfig from "@configs/samehadaku.config.js";
 import { parse, type HTMLElement } from "node-html-parser";
+import { proxyFetch, isVercel } from "@helpers/proxyFetch.js";
 
 const { baseUrl } = samehadakuConfig;
 
 const samehadakuScraper = {
   async scrapeDOM(pathname: string, ref?: string, sanitize: boolean = false): Promise<HTMLElement> {
-    const { gotScraping } = await import("got-scraping");
-
     const url = new URL(pathname, baseUrl).toString();
     const headers = {
       "Referer": ref ? (ref.startsWith("http") ? ref : new URL(ref, baseUrl).toString()) : baseUrl,
@@ -15,6 +14,16 @@ const samehadakuScraper = {
 
     console.log(`[Samehadaku] Scraping ${url}`);
 
+    // Di Vercel: route melalui CF Worker proxy
+    if (isVercel) {
+      const res = await proxyFetch(url, { headers });
+      if (!res.ok) throw new Error(`Samehadaku: HTTP ${res.status} for ${url}`);
+      const body = await res.text();
+      return parse(body, { parseNoneClosedTags: true });
+    }
+
+    // Localhost: got-scraping langsung
+    const { gotScraping } = await import("got-scraping");
     try {
       const response = await gotScraping({
         url,
